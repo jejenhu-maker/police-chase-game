@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>Police Chase!</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#111; touch-action:none; user-select:none; }
+canvas { display:block; }
+
+/* Google Fonts loaded inline */
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;700;900&display=swap');
+
+/* ── UI Overlay ── */
+#ui-overlay {
+  position:fixed; inset:0; z-index:100;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none;
+}
+#ui-overlay > div { pointer-events:auto; }
+
+/* ── Title Screen ── */
+#title-screen {
+  width:100%; height:100%;
+  background: linear-gradient(135deg, #0a1628 0%, #1a237e 40%, #0d47a1 70%, #01579b 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:relative; overflow:hidden;
+}
+#title-screen::before {
+  content:''; position:absolute; inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px);
+  pointer-events:none;
+}
+.title-top-images {
+  display:flex; gap:24px; margin-bottom:20px; z-index:1;
+}
+.title-img-box {
+  width:120px; height:120px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:64px; position:relative; overflow:hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.title-img-box.criminal {
+  background: linear-gradient(145deg, #b71c1c, #d32f2f);
+  border: 3px solid #ef5350;
+}
+.title-img-box.arrested {
+  background: linear-gradient(145deg, #1b5e20, #388e3c);
+  border: 3px solid #66bb6a;
+}
+.title-img-box .badge {
+  position:absolute; bottom:4px; right:4px;
+  font-size:14px; background:rgba(0,0,0,0.6);
+  padding:2px 6px; border-radius:8px; color:#fff;
+  font-family:'Nunito',sans-serif; font-weight:700;
+}
+.title-main-text {
+  font-family:'Bangers',cursive; font-size:clamp(48px,10vw,96px);
+  color:#fff; text-shadow: 0 0 20px rgba(33,150,243,0.8), 0 4px 8px rgba(0,0,0,0.5);
+  letter-spacing:4px; z-index:1; margin-bottom:4px;
+}
+.title-sub {
+  font-family:'Nunito',sans-serif; font-size:clamp(16px,3vw,24px);
+  color:rgba(255,255,255,0.7); font-weight:700; z-index:1;
+  margin-bottom:32px; letter-spacing:2px;
+}
+.title-btn {
+  font-family:'Bangers',cursive; font-size:28px; letter-spacing:2px;
+  border:none; border-radius:12px; padding:14px 48px;
+  cursor:pointer; transition: all 0.2s; z-index:1;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.title-btn:active { transform:scale(0.95); }
+#btn-start {
+  background: linear-gradient(135deg, #f44336, #e91e63);
+  color:#fff; margin-bottom:16px;
+}
+#btn-start:hover { background: linear-gradient(135deg, #e91e63, #f44336); }
+#btn-howto {
+  background: rgba(255,255,255,0.15); color:#fff;
+  border: 2px solid rgba(255,255,255,0.3);
+  font-size:20px; padding:10px 36px;
+  backdrop-filter: blur(8px);
+}
+#btn-howto:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Flashing lights on title ── */
+.police-lights {
+  position:absolute; top:0; left:0; right:0; height:6px; z-index:2;
+  display:flex;
+}
+.police-lights .red, .police-lights .blue {
+  flex:1; height:100%;
+}
+.police-lights .red { animation: flashRed 0.8s infinite; }
+.police-lights .blue { animation: flashBlue 0.8s infinite 0.4s; }
+@keyframes flashRed { 0%,49%{background:#f44336;} 50%,100%{background:transparent;} }
+@keyframes flashBlue { 0%,49%{background:#2196f3;} 50%,100%{background:transparent;} }
+
+/* ── How to Play Modal ── */
+#howto-modal {
+  position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,0.85); backdrop-filter:blur(8px);
+  display:none; align-items:center; justify-content:center;
+}
+#howto-modal.active { display:flex; }
+#howto-content {
+  background: linear-gradient(145deg, #1a237e, #283593);
+  border-radius:20px; padding:32px; max-width:480px; width:90%;
+  color:#fff; position:relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  border: 2px solid rgba(255,255,255,0.1);
+  max-height:80vh; overflow-y:auto;
+}
+#howto-content h2 {
+  font-family:'Bangers',cursive; font-size:32px;
+  margin-bottom:20px; text-align:center;
+  text-shadow: 0 0 10px rgba(33,150,243,0.6);
+}
+#howto-content p, #howto-content li {
+  font-family:'Nunito',sans-serif; font-size:15px;
+  line-height:1.7; color:rgba(255,255,255,0.9);
+}
+#howto-content ul { padding-left:20px; margin:12px 0; }
+#howto-content li { margin-bottom:8px; }
+#howto-content .emoji-label { font-size:20px; margin-right:8px; }
+#btn-close-howto {
+  position:absolute; top:12px; right:12px;
+  background:rgba(255,255,255,0.15); border:none;
+  color:#fff; font-size:20px; width:36px; height:36px;
+  border-radius:50%; cursor:pointer; font-family:'Nunito',sans-serif; font-weight:900;
+}
+
+/* ── HUD ── */
+#game-hud {
+  position:fixed; top:0; left:0; right:0; z-index:50;
+  display:none; padding:12px 16px;
+  font-family:'Nunito',sans-serif;
+}
+#game-hud.active { display:flex; justify-content:space-between; align-items:center; }
+#hud-level {
+  font-family:'Bangers',cursive; font-size:24px; color:#fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.4); padding:6px 16px; border-radius:10px;
+  backdrop-filter:blur(4px);
+}
+#hud-criminals {
+  font-size:18px; color:#fff; font-weight:700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.4); padding:6px 16px; border-radius:10px;
+  backdrop-filter:blur(4px);
+}
+#hud-daynight {
+  font-size:22px;
+  background: rgba(0,0,0,0.4); padding:4px 12px; border-radius:10px;
+  backdrop-filter:blur(4px);
+}
+
+/* ── Arrest Panel ── */
+#arrest-panel {
+  position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
+  z-index:60; display:none;
+  background: rgba(0,0,0,0.85); backdrop-filter:blur(12px);
+  border-radius:16px; padding:20px 24px;
+  border: 2px solid rgba(255,255,255,0.15);
+  text-align:center; min-width:280px;
+}
+#arrest-panel.active { display:block; }
+#arrest-panel h3 {
+  font-family:'Bangers',cursive; font-size:24px; color:#f44336;
+  margin-bottom:12px;
+}
+#arrest-panel p {
+  font-family:'Nunito',sans-serif; color:rgba(255,255,255,0.8);
+  font-size:14px; margin-bottom:16px;
+}
+.arrest-options { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.arrest-btn {
+  font-family:'Nunito',sans-serif; font-weight:700;
+  padding:10px 20px; border:none; border-radius:10px;
+  cursor:pointer; font-size:14px; transition:all 0.2s;
+  min-width:80px;
+}
+.arrest-btn:active { transform:scale(0.93); }
+.arrest-btn.fine { background:#ff9800; color:#fff; }
+.arrest-btn.jail { background:#f44336; color:#fff; }
+
+/* ── Level Complete ── */
+#level-complete {
+  position:fixed; inset:0; z-index:150;
+  display:none; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.8); backdrop-filter:blur(6px);
+}
+#level-complete.active { display:flex; }
+#level-complete-inner {
+  text-align:center; animation: popIn 0.5s ease;
+}
+@keyframes popIn { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+#level-complete-inner h2 {
+  font-family:'Bangers',cursive; font-size:clamp(36px,8vw,64px);
+  color:#4caf50; text-shadow:0 0 20px rgba(76,175,80,0.6);
+  margin-bottom:12px;
+}
+#level-complete-inner p {
+  font-family:'Nunito',sans-serif; font-size:20px;
+  color:rgba(255,255,255,0.8); margin-bottom:24px;
+}
+#btn-next-level {
+  font-family:'Bangers',cursive; font-size:24px;
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+  color:#fff; border:none; border-radius:12px;
+  padding:12px 40px; cursor:pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+/* ── Good Ending ── */
+#good-ending {
+  position:fixed; inset:0; z-index:200;
+  display:none; align-items:center; justify-content:center;
+  background: radial-gradient(ellipse at center, #1a237e 0%, #0a0a2e 100%);
+}
+#good-ending.active { display:flex; }
+#good-ending-inner {
+  text-align:center; animation: popIn 0.8s ease;
+}
+#good-ending-inner h1 {
+  font-family:'Bangers',cursive; font-size:clamp(48px,12vw,80px);
+  color:#ffd54f;
+  text-shadow: 0 0 30px rgba(255,213,79,0.6), 0 4px 12px rgba(0,0,0,0.4);
+  margin-bottom:8px;
+}
+#good-ending-inner .subtitle {
+  font-family:'Nunito',sans-serif; font-size:18px;
+  color:rgba(255,255,255,0.7); margin-bottom:24px;
+}
+.ending-hero {
+  font-size:80px; margin:20px 0;
+  animation: float 2s ease-in-out infinite;
+}
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.ending-stars { font-size:32px; margin-bottom:24px; }
+#btn-play-again {
+  font-family:'Bangers',cursive; font-size:24px;
+  background: linear-gradient(135deg, #f44336, #e91e63);
+  color:#fff; border:none; border-radius:12px;
+  padding:12px 40px; cursor:pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+/* ── Joysticks ── */
+.joystick-zone {
+  position:fixed; bottom:20px; z-index:80;
+  width:140px; height:140px;
+}
+.joystick-zone.left { left:20px; }
+.joystick-zone.right { right:20px; }
+.joystick-base {
+  width:100%; height:100%; border-radius:50%;
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.25);
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
+.joystick-label {
+  position:absolute; top:-22px; left:50%; transform:translateX(-50%);
+  font-family:'Nunito',sans-serif; font-size:12px; font-weight:700;
+  color:rgba(255,255,255,0.6); text-transform:uppercase; letter-spacing:1px;
+  white-space:nowrap;
+}
+.joystick-knob {
+  width:50px; height:50px; border-radius:50%;
+  background: rgba(255,255,255,0.35);
+  border: 2px solid rgba(255,255,255,0.5);
+  position:absolute;
+  transition: background 0.1s;
+}
+.joystick-knob.active { background: rgba(255,255,255,0.55); }
+#joystick-left, #joystick-right { display:none; }
+#joystick-left.active, #joystick-right.active { display:block; }
+
+/* ── Notification Toast ── */
+#toast {
+  position:fixed; top:60px; left:50%; transform:translateX(-50%);
+  z-index:90; font-family:'Nunito',sans-serif; font-weight:700;
+  font-size:16px; padding:10px 24px; border-radius:10px;
+  background:rgba(0,0,0,0.75); color:#fff;
+  backdrop-filter:blur(6px); display:none;
+  transition: opacity 0.3s;
+  text-align:center; max-width:90%;
+}
+#toast.active { display:block; animation: fadeInOut 2.5s ease; }
+@keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(-10px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+
+/* ── Minimap ── */
+#minimap {
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  z-index:70; display:none;
+  width:100px; height:100px; border-radius:50%;
+  background:rgba(0,0,0,0.6); border:2px solid rgba(255,255,255,0.2);
+  overflow:hidden;
+}
+#minimap.active { display:block; }
+#minimap canvas { width:100%; height:100%; border-radius:50%; }
+</style>
+</head>
+<body>
+
+<!-- Title Screen -->
+<div id="title-screen">
+  <div class="police-lights"><div class="red"></div><div class="blue"></div></div>
+  <div class="title-top-images">
+    <div class="title-img-box criminal">🚗💨<div class="badge">WANTED</div></div>
+    <div class="title-img-box arrested">👮‍♂️🔒<div class="badge">BUSTED</div></div>
+  </div>
+  <div class="title-main-text">POLICE CHASE!</div>
+  <div class="title-sub">PROTECT THE CITY</div>
+  <button class="title-btn" id="btn-howto">❓ HOW TO PLAY</button>
+  <br>
+  <button class="title-btn" id="btn-start">🚔 START</button>
+</div>
+
+<!-- How to Play Modal -->
+<div id="howto-modal">
+  <div id="howto-content">
+    <button id="btn-close-howto">✕</button>
+    <h2>📋 HOW TO PLAY</h2>
+    <p>You are a <b>police officer</b> driving a patrol car! Your mission: find and arrest all the criminals in the city.</p>
+    <ul>
+      <li><span class="emoji-label">🕹️</span><b>Move:</b> Left joystick (mobile) or WASD / Arrow keys</li>
+      <li><span class="emoji-label">👀</span><b>Look:</b> Right joystick (mobile) or mouse drag</li>
+      <li><span class="emoji-label">🔍</span><b>Find criminals:</b> Look for the red markers — drive close to catch them!</li>
+      <li><span class="emoji-label">⚖️</span><b>Arrest:</b> Choose to <b>Fine</b> or <b>Send to Jail</b></li>
+      <li><span class="emoji-label">⚠️</span><b>Warning:</b> Don't hit pedestrians!</li>
+      <li><span class="emoji-label">🌅</span>Day and night will change as you patrol</li>
+      <li><span class="emoji-label">🏆</span>Complete all 10 levels to win!</li>
+    </ul>
+    <p style="text-align:center;margin-top:16px;font-size:13px;opacity:0.6;">Each level has more criminals to catch. Good luck, officer! 🚨</p>
+  </div>
+</div>
+
+<!-- Game HUD -->
+<div id="game-hud">
+  <div id="hud-level">LEVEL 1</div>
+  <div id="hud-criminals">🔴 0 / 2</div>
+  <div id="hud-daynight">☀️</div>
+</div>
+
+<!-- Arrest Panel -->
+<div id="arrest-panel">
+  <h3>🚨 CRIMINAL CAUGHT!</h3>
+  <p>What should we do with this criminal?</p>
+  <div class="arrest-options">
+    <button class="arrest-btn fine" id="btn-fine">💰 Fine</button>
+    <button class="arrest-btn jail" id="btn-jail">🔒 Jail</button>
+  </div>
+</div>
+
+<!-- Level Complete -->
+<div id="level-complete">
+  <div id="level-complete-inner">
+    <h2>✅ LEVEL COMPLETE!</h2>
+    <p id="level-complete-text">All criminals arrested!</p>
+    <button id="btn-next-level">▶ NEXT LEVEL</button>
+  </div>
+</div>
+
+<!-- Good Ending -->
+<div id="good-ending">
+  <div id="good-ending-inner">
+    <h1>🏆 GOOD ENDING!</h1>
+    <div class="subtitle">The city is safe thanks to you!</div>
+    <div class="ending-hero">👮‍♂️</div>
+    <div class="ending-stars">⭐⭐⭐⭐⭐</div>
+    <p style="font-family:'Nunito',sans-serif;color:rgba(255,255,255,0.6);margin-bottom:24px;">
+      You are the greatest officer in the city!
+    </p>
+    <button id="btn-play-again">🔄 PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- Joysticks -->
+<div id="joystick-left" class="joystick-zone left">
+  <div class="joystick-base">
+    <div class="joystick-label">MOVE</div>
+    <div class="joystick-knob" id="knob-left"></div>
+  </div>
+</div>
+<div id="joystick-right" class="joystick-zone right">
+  <div class="joystick-base">
+    <div class="joystick-label">LOOK</div>
+    <div class="joystick-knob" id="knob-right"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ══════════════════════════════════════
+// GAME CONFIG
+// ══════════════════════════════════════
+const LEVELS = 10;
+const criminalsPerLevel = (lvl) => lvl + 1; // Level 1 = 2, Level 10 = 11
+const CATCH_DIST = 3.5;
+const WARN_DIST = 8;
+const CITY_SIZE = 120;
+const PED_HIT_DIST = 1.8;
+const MOVE_SPEED = 12;
+const TURN_SPEED = Math.PI / 2; // 90deg/sec
+
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+let gameState = 'TITLE'; // TITLE, PLAYING, ARREST, LEVEL_COMPLETE, GOOD_ENDING
+let currentLevel = 1;
+let caughtCount = 0;
+let totalCriminals = 0;
+let dayTime = 0; // 0..1 day cycle
+let arrestTarget = null;
+let warningCooldown = 0;
+let pedHitCooldown = 0;
+
+// ══════════════════════════════════════
+// THREE.JS SETUP
+// ══════════════════════════════════════
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+// ── Lighting ──
+const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+sunLight.position.set(50, 80, 30);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -80; sunLight.shadow.camera.right = 80;
+sunLight.shadow.camera.top = 80; sunLight.shadow.camera.bottom = -80;
+scene.add(sunLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x444422, 0.4);
+scene.add(hemiLight);
+
+// Sun/Moon visual
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(3, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xffdd44 })
+);
+scene.add(sunMesh);
+
+const moonMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(2, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xddeeff })
+);
+scene.add(moonMesh);
+
+// ── Ground ──
+const groundGeo = new THREE.PlaneGeometry(CITY_SIZE * 2, CITY_SIZE * 2);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ── Roads ──
+function createRoad(x, z, w, h) {
+  const geo = new THREE.PlaneGeometry(w, h);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  const road = new THREE.Mesh(geo, mat);
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(x, 0.02, z);
+  road.receiveShadow = true;
+  scene.add(road);
+  // Lane markings
+  const dashes = Math.floor(h / 6);
+  for (let i = 0; i < dashes; i++) {
+    const dg = new THREE.PlaneGeometry(0.3, 2);
+    const dm = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    const dash = new THREE.Mesh(dg, dm);
+    dash.rotation.x = -Math.PI / 2;
+    if (w > h) {
+      dash.rotation.z = Math.PI / 2;
+      dash.position.set(x - h/2 + i * 6 + 3, 0.03, z);
+    } else {
+      dash.position.set(x, 0.03, z - h/2 + i * 6 + 3);
+    }
+    scene.add(dash);
+  }
+}
+// Main roads - grid pattern
+for (let i = -2; i <= 2; i++) {
+  createRoad(i * 30, 0, 8, CITY_SIZE * 1.5);
+  createRoad(0, i * 30, CITY_SIZE * 1.5, 8);
+}
+
+// ══════════════════════════════════════
+// BUILDINGS
+// ══════════════════════════════════════
+const buildings = [];
+const buildingData = [
+  // Police Station
+  { x: 20, z: -20, w: 14, h: 8, d: 12, color: 0x1a237e, label: '🏛️', name: 'POLICE STATION' },
+  // Fire Station
+  { x: -20, z: -20, w: 12, h: 7, d: 10, color: 0xb71c1c, label: '🚒', name: 'FIRE STATION' },
+  // 7-Eleven
+  { x: 20, z: 20, w: 8, h: 5, d: 8, color: 0x00695c, label: '🏪', name: '7-ELEVEN' },
+  // Hospital
+  { x: -20, z: 20, w: 10, h: 9, d: 10, color: 0xf5f5f5, label: '🏥', name: 'HOSPITAL' },
+];
+
+// Random city buildings
+const occupiedSpots = new Set();
+buildingData.forEach(b => occupiedSpots.add(`${Math.round(b.x/10)},${Math.round(b.z/10)}`));
+
+for (let i = 0; i < 40; i++) {
+  let bx, bz, key;
+  let tries = 0;
+  do {
+    bx = (Math.random() - 0.5) * CITY_SIZE * 0.9;
+    bz = (Math.random() - 0.5) * CITY_SIZE * 0.9;
+    key = `${Math.round(bx/8)},${Math.round(bz/8)}`;
+    tries++;
+  } while (occupiedSpots.has(key) && tries < 50);
+  // Skip if on road
+  let onRoad = false;
+  for (let r = -2; r <= 2; r++) {
+    if (Math.abs(bx - r * 30) < 6 || Math.abs(bz - r * 30) < 6) { onRoad = true; break; }
+  }
+  if (onRoad) continue;
+  occupiedSpots.add(key);
+  const bw = 4 + Math.random() * 6;
+  const bh = 4 + Math.random() * 14;
+  const bd = 4 + Math.random() * 6;
+  const colors = [0x78909c, 0x8d6e63, 0x90a4ae, 0xbcaaa4, 0xa1887f, 0x80cbc4, 0xce93d8, 0xffcc80];
+  buildingData.push({ x: bx, z: bz, w: bw, h: bh, d: bd, color: colors[i % colors.length] });
+}
+
+buildingData.forEach(b => {
+  const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
+  const mat = new THREE.MeshLambertMaterial({ color: b.color });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(b.x, b.h / 2, b.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  buildings.push({ mesh, data: b });
+
+  // Windows
+  const windowColor = 0xfff9c4;
+  const rows = Math.floor(b.h / 2.5);
+  const cols = Math.floor(b.w / 2);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < Math.min(cols, 3); c++) {
+      const wg = new THREE.PlaneGeometry(0.8, 1.2);
+      const wm = new THREE.MeshBasicMaterial({ color: windowColor, transparent: true, opacity: 0.6 });
+      const win = new THREE.Mesh(wg, wm);
+      win.position.set(
+        b.x - b.w/2 + 1.5 + c * 2,
+        1.5 + r * 2.5,
+        b.z + b.d/2 + 0.01
+      );
+      scene.add(win);
+    }
+  }
+
+  // Label sign for named buildings
+  if (b.name) {
+    const signGeo = new THREE.PlaneGeometry(b.w * 0.8, 1.5);
+    const signCanvas = document.createElement('canvas');
+    signCanvas.width = 256; signCanvas.height = 64;
+    const ctx = signCanvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.name, 128, 40);
+    const signTex = new THREE.CanvasTexture(signCanvas);
+    const signMat = new THREE.MeshBasicMaterial({ map: signTex, transparent: true });
+    const sign = new THREE.Mesh(signGeo, signMat);
+    sign.position.set(b.x, b.h + 1.2, b.z + b.d/2 + 0.1);
+    scene.add(sign);
+  }
+});
+
+// ── Street decorations: trees, planters ──
+for (let i = 0; i < 60; i++) {
+  const tx = (Math.random() - 0.5) * CITY_SIZE;
+  const tz = (Math.random() - 0.5) * CITY_SIZE;
+  // Skip if on road
+  let onRoad = false;
+  for (let r = -2; r <= 2; r++) {
+    if (Math.abs(tx - r * 30) < 5 || Math.abs(tz - r * 30) < 5) { onRoad = true; break; }
+  }
+  if (onRoad) continue;
+
+  // Tree
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.3, 2),
+    new THREE.MeshLambertMaterial({ color: 0x5d4037 })
+  );
+  trunk.position.set(tx, 1, tz);
+  trunk.castShadow = true;
+  scene.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2 + Math.random() * 0.6, 8, 8),
+    new THREE.MeshLambertMaterial({ color: 0x2e7d32 + Math.floor(Math.random() * 0x002200) })
+  );
+  leaves.position.set(tx, 2.8 + Math.random() * 0.5, tz);
+  leaves.castShadow = true;
+  scene.add(leaves);
+}
+
+// ══════════════════════════════════════
+// VEHICLES (decoration)
+// ══════════════════════════════════════
+function createVehicle(x, z, color, topColor, hasLights = false) {
+  const group = new THREE.Group();
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 0.8, 4),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  body.position.y = 0.6;
+  body.castShadow = true;
+  group.add(body);
+  // Cabin
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.7, 2),
+    new THREE.MeshLambertMaterial({ color: topColor })
+  );
+  cabin.position.set(0, 1.25, -0.3);
+  cabin.castShadow = true;
+  group.add(cabin);
+  // Wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 8);
+  const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  [[-0.9, 0.3, 1.2], [0.9, 0.3, 1.2], [-0.9, 0.3, -1.2], [0.9, 0.3, -1.2]].forEach(([wx,wy,wz]) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(wx, wy, wz);
+    group.add(w);
+  });
+  if (hasLights) {
+    const redLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.3, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    redLight.position.set(-0.4, 1.7, -0.3);
+    redLight.userData.isLight = true;
+    redLight.userData.lightColor = 'red';
+    group.add(redLight);
+
+    const blueLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.3, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0x2196f3 })
+    );
+    blueLight.position.set(0.4, 1.7, -0.3);
+    blueLight.userData.isLight = true;
+    blueLight.userData.lightColor = 'blue';
+    group.add(blueLight);
+
+    // Point lights for sirens
+    const redPL = new THREE.PointLight(0xff0000, 2, 10);
+    redPL.position.set(-0.4, 2, -0.3);
+    redPL.userData.isSiren = true;
+    redPL.userData.sirenColor = 'red';
+    group.add(redPL);
+    const bluePL = new THREE.PointLight(0x2196f3, 2, 10);
+    bluePL.position.set(0.4, 2, -0.3);
+    bluePL.userData.isSiren = true;
+    bluePL.userData.sirenColor = 'blue';
+    group.add(bluePL);
+  }
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// Player police car
+const playerCar = createVehicle(0, 0, 0x1565c0, 0x90caf9, true);
+let playerX = 0, playerZ = 5, playerYaw = 0;
+
+// Parked vehicles (decoration)
+createVehicle(-22, -14, 0xc62828, 0xef9a9a); // Fire truck style
+createVehicle(15, -25, 0xffffff, 0xe3f2fd);  // Ambulance style
+createVehicle(-10, 25, 0xffb300, 0xffe082);   // Random car
+
+// ══════════════════════════════════════
+// PEDESTRIANS
+// ══════════════════════════════════════
+const pedestrians = [];
+function createPedestrian(x, z) {
+  const group = new THREE.Group();
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25, 0.25, 1, 8),
+    new THREE.MeshLambertMaterial({ color: [0x5c6bc0, 0xef5350, 0x66bb6a, 0xffa726, 0xab47bc][Math.floor(Math.random()*5)] })
+  );
+  body.position.y = 0.7;
+  group.add(body);
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 8, 8),
+    new THREE.MeshLambertMaterial({ color: 0xffccbc })
+  );
+  head.position.y = 1.4;
+  group.add(head);
+  group.position.set(x, 0, z);
+  scene.add(group);
+
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 0.8 + Math.random() * 1.2;
+  return { group, vx: Math.cos(angle) * speed, vz: Math.sin(angle) * speed, changeTimer: 3 + Math.random() * 5 };
+}
+for (let i = 0; i < 20; i++) {
+  let px, pz, onRoad;
+  do {
+    px = (Math.random() - 0.5) * CITY_SIZE * 0.7;
+    pz = (Math.random() - 0.5) * CITY_SIZE * 0.7;
+    onRoad = false;
+    // Prefer sidewalk near roads
+  } while (false);
+  pedestrians.push(createPedestrian(px, pz));
+}
+
+// ══════════════════════════════════════
+// CRIMINALS
+// ══════════════════════════════════════
+let criminals = [];
+function spawnCriminals(count) {
+  // Remove old
+  criminals.forEach(c => scene.remove(c.group));
+  criminals = [];
+  for (let i = 0; i < count; i++) {
+    let cx, cz;
+    do {
+      cx = (Math.random() - 0.5) * CITY_SIZE * 0.7;
+      cz = (Math.random() - 0.5) * CITY_SIZE * 0.7;
+    } while (Math.sqrt(cx*cx + cz*cz) < 15); // Not too close to start
+
+    const group = new THREE.Group();
+    // Criminal body (dark)
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.3, 1.1, 8),
+      new THREE.MeshLambertMaterial({ color: 0x212121 })
+    );
+    body.position.y = 0.75;
+    group.add(body);
+    // Head with mask
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 8, 8),
+      new THREE.MeshLambertMaterial({ color: 0x333333 })
+    );
+    head.position.y = 1.5;
+    group.add(head);
+    // Red marker above
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff1744 })
+    );
+    marker.position.y = 2.5;
+    group.add(marker);
+    // Marker glow
+    const glow = new THREE.PointLight(0xff1744, 1.5, 6);
+    glow.position.y = 2.5;
+    group.add(glow);
+
+    group.position.set(cx, 0, cz);
+    scene.add(group);
+    criminals.push({ group, caught: false, x: cx, z: cz });
+  }
+}
+
+// ══════════════════════════════════════
+// INPUT
+// ══════════════════════════════════════
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Mouse look
+let mouseDrag = false, lastMouseX = 0;
+renderer.domElement.addEventListener('mousedown', e => { mouseDrag = true; lastMouseX = e.clientX; });
+window.addEventListener('mousemove', e => {
+  if (mouseDrag && gameState === 'PLAYING') {
+    const dx = e.clientX - lastMouseX;
+    playerYaw -= dx * 0.005;
+    lastMouseX = e.clientX;
+  }
+});
+window.addEventListener('mouseup', () => { mouseDrag = false; });
+
+// Touch joysticks
+const joyState = { left: { x: 0, y: 0, id: -1 }, right: { x: 0, y: 0, id: -1 } };
+
+function setupJoystick(side) {
+  const zone = document.getElementById(`joystick-${side}`);
+  const knob = document.getElementById(`knob-${side}`);
+  const base = zone.querySelector('.joystick-base');
+  const halfSize = 70;
+  const maxDist = 45;
+
+  function handleMove(touch) {
+    const rect = base.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = touch.clientX - cx;
+    let dy = touch.clientY - cy;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
+    knob.style.left = (halfSize - 25 + dx) + 'px';
+    knob.style.top = (halfSize - 25 + dy) + 'px';
+    knob.classList.add('active');
+    joyState[side].x = dx / maxDist;
+    joyState[side].y = dy / maxDist;
+  }
+
+  function handleEnd() {
+    knob.style.left = (halfSize - 25) + 'px';
+    knob.style.top = (halfSize - 25) + 'px';
+    knob.classList.remove('active');
+    joyState[side].x = 0;
+    joyState[side].y = 0;
+    joyState[side].id = -1;
+  }
+
+  zone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    joyState[side].id = t.identifier;
+    handleMove(t);
+  }, { passive: false });
+
+  zone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyState[side].id) handleMove(t);
+    }
+  }, { passive: false });
+
+  zone.addEventListener('touchend', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyState[side].id) handleEnd();
+    }
+  });
+  zone.addEventListener('touchcancel', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyState[side].id) handleEnd();
+    }
+  });
+}
+setupJoystick('left');
+setupJoystick('right');
+
+// Detect touch device
+const isTouchDevice = 'ontouchstart' in window;
+
+// ══════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.remove('active');
+  void toast.offsetWidth;
+  toast.classList.add('active');
+  setTimeout(() => toast.classList.remove('active'), 2500);
+}
+
+function updateHUD() {
+  document.getElementById('hud-level').textContent = `LEVEL ${currentLevel}`;
+  document.getElementById('hud-criminals').textContent = `🔴 ${caughtCount} / ${totalCriminals}`;
+  const hour = dayTime * 24;
+  const isDay = hour > 6 && hour < 18;
+  document.getElementById('hud-daynight').textContent = isDay ? '☀️' : '🌙';
+}
+
+// ══════════════════════════════════════
+// GAME LOGIC
+// ══════════════════════════════════════
+function startLevel(level) {
+  currentLevel = level;
+  totalCriminals = criminalsPerLevel(level);
+  caughtCount = 0;
+  playerX = 0; playerZ = 5; playerYaw = 0;
+  gameState = 'PLAYING';
+  arrestTarget = null;
+
+  spawnCriminals(totalCriminals);
+  updateHUD();
+
+  document.getElementById('game-hud').classList.add('active');
+  document.getElementById('arrest-panel').classList.remove('active');
+  document.getElementById('level-complete').classList.remove('active');
+  document.getElementById('good-ending').classList.remove('active');
+  document.getElementById('title-screen').style.display = 'none';
+
+  if (isTouchDevice) {
+    document.getElementById('joystick-left').classList.add('active');
+    document.getElementById('joystick-right').classList.add('active');
+  }
+
+  showToast(`Level ${level} — Find ${totalCriminals} criminals! 🚨`);
+}
+
+function arrestCriminal(criminal) {
+  arrestTarget = criminal;
+  gameState = 'ARREST';
+  document.getElementById('arrest-panel').classList.add('active');
+}
+
+function processArrest(action) {
+  if (!arrestTarget) return;
+  arrestTarget.caught = true;
+  scene.remove(arrestTarget.group);
+  caughtCount++;
+  updateHUD();
+
+  const msg = action === 'fine' ? '💰 Criminal fined!' : '🔒 Sent to jail!';
+  showToast(msg);
+
+  document.getElementById('arrest-panel').classList.remove('active');
+  arrestTarget = null;
+  gameState = 'PLAYING';
+
+  // Check level complete
+  if (caughtCount >= totalCriminals) {
+    setTimeout(() => {
+      if (currentLevel >= LEVELS) {
+        // Good ending!
+        gameState = 'GOOD_ENDING';
+        document.getElementById('game-hud').classList.remove('active');
+        document.getElementById('joystick-left').classList.remove('active');
+        document.getElementById('joystick-right').classList.remove('active');
+        document.getElementById('good-ending').classList.add('active');
+      } else {
+        gameState = 'LEVEL_COMPLETE';
+        document.getElementById('level-complete').classList.add('active');
+        document.getElementById('level-complete-text').textContent =
+          `You caught all ${totalCriminals} criminals!`;
+      }
+    }, 800);
+  }
+}
+
+// ══════════════════════════════════════
+// UI EVENT LISTENERS
+// ══════════════════════════════════════
+document.getElementById('btn-start').addEventListener('click', () => startLevel(1));
+document.getElementById('btn-howto').addEventListener('click', () => {
+  document.getElementById('howto-modal').classList.add('active');
+});
+document.getElementById('btn-close-howto').addEventListener('click', () => {
+  document.getElementById('howto-modal').classList.remove('active');
+});
+document.getElementById('btn-fine').addEventListener('click', () => processArrest('fine'));
+document.getElementById('btn-jail').addEventListener('click', () => processArrest('jail'));
+document.getElementById('btn-next-level').addEventListener('click', () => {
+  document.getElementById('level-complete').classList.remove('active');
+  startLevel(currentLevel + 1);
+});
+document.getElementById('btn-play-again').addEventListener('click', () => {
+  document.getElementById('good-ending').classList.remove('active');
+  document.getElementById('title-screen').style.display = 'flex';
+  gameState = 'TITLE';
+});
+
+// ══════════════════════════════════════
+// COLLISION HELPERS
+// ══════════════════════════════════════
+function checkBuildingCollision(nx, nz) {
+  for (const b of buildings) {
+    const d = b.data;
+    const hw = d.w / 2 + 1.5;
+    const hd = d.d / 2 + 1.5;
+    if (nx > d.x - hw && nx < d.x + hw && nz > d.z - hd && nz < d.z + hd) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ══════════════════════════════════════
+// GAME LOOP
+// ══════════════════════════════════════
+const clock = new THREE.Clock();
+let sirenPhase = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  sirenPhase += dt * 5;
+
+  // ── Day/Night cycle ──
+  dayTime = (dayTime + dt * 0.005) % 1; // Full cycle ~200s
+  const hour = dayTime * 24;
+  const isDay = hour > 6 && hour < 18;
+  const sunAngle = ((hour - 6) / 12) * Math.PI;
+
+  if (isDay) {
+    const sunY = Math.sin(sunAngle) * 80;
+    const sunX = Math.cos(sunAngle) * 80;
+    sunLight.position.set(sunX, Math.max(sunY, 5), 30);
+    sunLight.intensity = 0.4 + Math.sin(sunAngle) * 0.8;
+    ambientLight.intensity = 0.3 + Math.sin(sunAngle) * 0.3;
+    scene.background = new THREE.Color().setHSL(0.58, 0.6, 0.3 + Math.sin(sunAngle) * 0.35);
+    scene.fog = new THREE.Fog(scene.background, 60, 150);
+    sunMesh.position.set(sunX * 0.8, Math.max(sunY, 10), 30);
+    sunMesh.visible = true;
+    moonMesh.visible = false;
+    renderer.toneMappingExposure = 0.8 + Math.sin(sunAngle) * 0.4;
+  } else {
+    sunLight.intensity = 0.15;
+    ambientLight.intensity = 0.15;
+    scene.background = new THREE.Color(0x0a0a2e);
+    scene.fog = new THREE.Fog(0x0a0a2e, 30, 100);
+    sunMesh.visible = false;
+    moonMesh.visible = true;
+    const moonAngle = ((hour - 18 + 24) % 24 / 12) * Math.PI;
+    moonMesh.position.set(Math.cos(moonAngle) * 60, Math.sin(moonAngle) * 50 + 20, 20);
+    renderer.toneMappingExposure = 0.5;
+  }
+
+  if (gameState === 'PLAYING') {
+    // ── Input ──
+    let moveX = 0, moveZ = 0, turnInput = 0;
+
+    // Keyboard
+    if (keys['w'] || keys['arrowup']) moveZ = -1;
+    if (keys['s'] || keys['arrowdown']) moveZ = 1;
+    if (keys['a'] || keys['arrowleft']) moveX = -1;
+    if (keys['d'] || keys['arrowright']) moveX = 1;
+
+    // Joystick
+    moveX += joyState.left.x;
+    moveZ += joyState.left.y;
+    turnInput += joyState.right.x;
+
+    // Turn from right joystick
+    playerYaw -= turnInput * TURN_SPEED * dt;
+
+    // Movement in player's local space
+    const forward = new THREE.Vector3(-Math.sin(playerYaw), 0, -Math.cos(playerYaw));
+    const right = new THREE.Vector3(Math.cos(playerYaw), 0, -Math.sin(playerYaw));
+
+    const moveVec = new THREE.Vector3();
+    moveVec.addScaledVector(forward, -moveZ);
+    moveVec.addScaledVector(right, moveX);
+    if (moveVec.length() > 1) moveVec.normalize();
+
+    const nx = playerX + moveVec.x * MOVE_SPEED * dt;
+    const nz = playerZ + moveVec.z * MOVE_SPEED * dt;
+
+    // Boundary
+    const bound = CITY_SIZE * 0.85;
+    const clampX = Math.max(-bound, Math.min(bound, nx));
+    const clampZ = Math.max(-bound, Math.min(bound, nz));
+
+    if (!checkBuildingCollision(clampX, clampZ)) {
+      playerX = clampX;
+      playerZ = clampZ;
+    } else if (!checkBuildingCollision(clampX, playerZ)) {
+      playerX = clampX;
+    } else if (!checkBuildingCollision(playerX, clampZ)) {
+      playerZ = clampZ;
+    }
+
+    // Update car position & rotation
+    playerCar.position.set(playerX, 0, playerZ);
+    playerCar.rotation.y = playerYaw;
+
+    // Camera follow (3rd person)
+    const camDist = 8;
+    const camHeight = 5;
+    const camX = playerX + Math.sin(playerYaw) * camDist;
+    const camZ = playerZ + Math.cos(playerYaw) * camDist;
+    camera.position.lerp(new THREE.Vector3(camX, camHeight, camZ), 0.08);
+    camera.lookAt(playerX, 1.5, playerZ);
+
+    // ── Check criminal proximity ──
+    warningCooldown -= dt;
+    for (const c of criminals) {
+      if (c.caught) continue;
+      const dx = playerX - c.x;
+      const dz = playerZ - c.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+
+      if (dist < CATCH_DIST) {
+        arrestCriminal(c);
+        break;
+      } else if (dist < WARN_DIST && warningCooldown <= 0) {
+        showToast('🔥 Criminal nearby!');
+        warningCooldown = 3;
+      }
+    }
+
+    // ── Pedestrian AI & collision ──
+    pedHitCooldown -= dt;
+    pedestrians.forEach(p => {
+      p.changeTimer -= dt;
+      if (p.changeTimer <= 0) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 0.8 + Math.random() * 1.2;
+        p.vx = Math.cos(a) * s;
+        p.vz = Math.sin(a) * s;
+        p.changeTimer = 3 + Math.random() * 5;
+      }
+      const px = p.group.position.x + p.vx * dt;
+      const pz = p.group.position.z + p.vz * dt;
+      // Keep in bounds
+      const pb = CITY_SIZE * 0.4;
+      if (Math.abs(px) < pb && Math.abs(pz) < pb) {
+        p.group.position.x = px;
+        p.group.position.z = pz;
+      } else {
+        p.vx *= -1; p.vz *= -1;
+      }
+      p.group.rotation.y = Math.atan2(p.vx, p.vz);
+
+      // Check hit by player
+      const dx = playerX - p.group.position.x;
+      const dz = playerZ - p.group.position.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      if (dist < PED_HIT_DIST && pedHitCooldown <= 0) {
+        showToast('⚠️ Careful! Don\'t hit pedestrians!');
+        pedHitCooldown = 3;
+      }
+    });
+
+    // ── Criminal idle animation (bob marker) ──
+    criminals.forEach(c => {
+      if (c.caught) return;
+      const marker = c.group.children[2]; // marker sphere
+      if (marker) marker.position.y = 2.5 + Math.sin(Date.now() * 0.003 + c.x) * 0.3;
+    });
+
+    updateHUD();
+  }
+
+  // ── Siren lights animation ──
+  playerCar.traverse(child => {
+    if (child.userData.isLight) {
+      const on = child.userData.lightColor === 'red'
+        ? Math.sin(sirenPhase) > 0
+        : Math.sin(sirenPhase) < 0;
+      child.visible = on;
+    }
+    if (child.userData.isSiren) {
+      child.intensity = child.userData.sirenColor === 'red'
+        ? (Math.sin(sirenPhase) > 0 ? 3 : 0)
+        : (Math.sin(sirenPhase) < 0 ? 3 : 0);
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start
+camera.position.set(0, 20, 30);
+camera.lookAt(0, 0, 0);
+animate();
+</script>
+</body>
+</html>
